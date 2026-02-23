@@ -161,14 +161,12 @@ Flags take precedence. When a flag is omitted, the corresponding environment var
 |---|---|
 | `-dir` | `GEEDER_DIR` |
 | `-driver` | `GEEDER_DRIVER` |
-| `-dsn` | `GEEDER_DSN`, `DATABASE_URL` |
-
-For `-dsn`, `GEEDER_DSN` is checked first, then `DATABASE_URL`.
+| `-dsn` | `GEEDER_DSN` |
 
 ```bash
 export GEEDER_DIR=./seeds
 export GEEDER_DRIVER=postgres
-export DATABASE_URL="postgres://user:pass@localhost/mydb"
+export GEEDER_DSN="postgres://user:pass@localhost/mydb"
 geeder
 ```
 

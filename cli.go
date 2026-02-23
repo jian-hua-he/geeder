@@ -25,9 +25,6 @@ func runMain(cfg mainConfig) error {
 	if cfg.DSN == "" {
 		cfg.DSN = os.Getenv("GEEDER_DSN")
 	}
-	if cfg.DSN == "" {
-		cfg.DSN = os.Getenv("DATABASE_URL")
-	}
 
 	if cfg.Dir == "" {
 		return fmt.Errorf("geeder: -dir flag is required")
@@ -70,11 +67,11 @@ func runMain(cfg mainConfig) error {
 //
 //	-dir    → GEEDER_DIR
 //	-driver → GEEDER_DRIVER
-//	-dsn    → GEEDER_DSN, DATABASE_URL
+//	-dsn    → GEEDER_DSN
 func Main() {
 	dir := flag.String("dir", "", "directory containing .sql seed files (env: GEEDER_DIR)")
 	driver := flag.String("driver", "", "database driver name (env: GEEDER_DRIVER)")
-	dsn := flag.String("dsn", "", "data source name / connection string (env: GEEDER_DSN, DATABASE_URL)")
+	dsn := flag.String("dsn", "", "data source name / connection string (env: GEEDER_DSN)")
 	flag.Parse()
 
 	cfg := mainConfig{

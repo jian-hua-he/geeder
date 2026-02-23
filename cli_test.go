@@ -103,15 +103,6 @@ func TestMain_EnvFallback(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("DATABASE_URL fallback for DSN", func(t *testing.T) {
-		t.Setenv("GEEDER_DIR", seedDir)
-		t.Setenv("GEEDER_DRIVER", "sqlite")
-		t.Setenv("DATABASE_URL", tmpDB)
-
-		err := runMain(mainConfig{})
-		require.NoError(t, err)
-	})
-
 	t.Run("flags take precedence over env", func(t *testing.T) {
 		t.Setenv("GEEDER_DIR", "/nonexistent")
 		t.Setenv("GEEDER_DRIVER", "bad")
