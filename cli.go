@@ -17,6 +17,19 @@ type mainConfig struct {
 
 func runMain(cfg mainConfig) error {
 	if cfg.Dir == "" {
+		cfg.Dir = os.Getenv("GEEDER_DIR")
+	}
+	if cfg.Driver == "" {
+		cfg.Driver = os.Getenv("GEEDER_DRIVER")
+	}
+	if cfg.DSN == "" {
+		cfg.DSN = os.Getenv("GEEDER_DSN")
+	}
+	if cfg.DSN == "" {
+		cfg.DSN = os.Getenv("DATABASE_URL")
+	}
+
+	if cfg.Dir == "" {
 		return fmt.Errorf("geeder: -dir flag is required")
 	}
 	if cfg.Driver == "" {
@@ -53,10 +66,15 @@ func runMain(cfg mainConfig) error {
 
 // Main is a CLI entry point that reads .sql files from a directory and executes them.
 // It parses -dir, -driver, and -dsn flags from the command line.
+// Flags take precedence; when omitted the following environment variables are checked:
+//
+//	-dir    → GEEDER_DIR
+//	-driver → GEEDER_DRIVER
+//	-dsn    → GEEDER_DSN, DATABASE_URL
 func Main() {
-	dir := flag.String("dir", "", "directory containing .sql seed files")
-	driver := flag.String("driver", "", "database driver name (e.g. sqlite, postgres, mysql)")
-	dsn := flag.String("dsn", "", "data source name / connection string")
+	dir := flag.String("dir", "", "directory containing .sql seed files (env: GEEDER_DIR)")
+	driver := flag.String("driver", "", "database driver name (env: GEEDER_DRIVER)")
+	dsn := flag.String("dsn", "", "data source name / connection string (env: GEEDER_DSN, DATABASE_URL)")
 	flag.Parse()
 
 	cfg := mainConfig{
