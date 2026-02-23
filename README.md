@@ -30,23 +30,14 @@ go get github.com/jian-hua-he/geeder
 
 ```
 seeds/
-├── 001_create_users.sql
-└── 002_seed_users.sql
+└── 001_seed_users.sql
 ```
 
 ```sql
--- seeds/001_create_users.sql
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'user'
-);
-```
-
-```sql
--- seeds/002_seed_users.sql
+-- seeds/001_seed_users.sql
 INSERT OR IGNORE INTO users (id, name, role) VALUES (1, 'admin', 'admin');
 INSERT OR IGNORE INTO users (id, name, role) VALUES (2, 'alice', 'user');
+INSERT OR IGNORE INTO users (id, name, role) VALUES (3, 'bob', 'user');
 ```
 
 ### 2. Run with the CLI
@@ -58,8 +49,7 @@ geeder -dir ./seeds -driver sqlite -dsn ./app.db
 Output:
 
 ```
-applied: 001_create_users.sql
-applied: 002_seed_users.sql
+applied: 001_seed_users.sql
 ```
 
 ### 3. Or use as a Go library
@@ -137,7 +127,7 @@ type Seed struct {
 1. Geeder reads all `*.sql` files from the provided `fs.FS` (or directory via CLI)
 2. Files are sorted alphabetically — use a naming convention like `001_`, `002_` to control order
 3. All SQL is executed in a **single transaction** — if any file fails, the entire batch is rolled back
-4. Seeds run every time — write idempotent SQL (e.g. `CREATE TABLE IF NOT EXISTS`, `INSERT OR IGNORE`)
+4. Seeds run every time — write idempotent SQL (e.g. `INSERT OR IGNORE`, `ON CONFLICT DO NOTHING`)
 
 ## Examples
 
