@@ -153,6 +153,25 @@ See the [`examples/`](examples/) directory:
 | `-driver` | Database driver name | `sqlite`, `postgres`, `mysql` |
 | `-dsn` | Data source name / connection string | `./app.db`, `postgres://user:pass@localhost/db` |
 
+## Environment Variables
+
+Flags take precedence. When a flag is omitted, the corresponding environment variable is used:
+
+| Flag | Environment Variable |
+|---|---|
+| `-dir` | `GEEDER_DIR` |
+| `-driver` | `GEEDER_DRIVER` |
+| `-dsn` | `GEEDER_DSN`, `DATABASE_URL` |
+
+For `-dsn`, `GEEDER_DSN` is checked first, then `DATABASE_URL`.
+
+```bash
+export GEEDER_DIR=./seeds
+export GEEDER_DRIVER=postgres
+export DATABASE_URL="postgres://user:pass@localhost/mydb"
+geeder
+```
+
 ## License
 
 MIT
