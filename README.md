@@ -78,6 +78,9 @@ func main() {
 	}
 	defer db.Close()
 
+	// Create schema manually or via a migration tool — geeder is for seeding data.
+	// db.Exec(`CREATE TABLE IF NOT EXISTS users (...)`)
+
 	seedFS, _ := fs.Sub(seedFiles, "seeds")
 	seeds, err := geeder.New(db, seedFS).Run(context.Background())
 	if err != nil {
