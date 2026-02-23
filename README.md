@@ -30,7 +30,8 @@ go get github.com/jian-hua-he/geeder
 
 ```
 seeds/
-└── 001_seed_users.sql
+├── 001_seed_users.sql
+└── 002_seed_products.sql
 ```
 
 ```sql
@@ -38,6 +39,13 @@ seeds/
 INSERT OR IGNORE INTO users (id, name, role) VALUES (1, 'admin', 'admin');
 INSERT OR IGNORE INTO users (id, name, role) VALUES (2, 'alice', 'user');
 INSERT OR IGNORE INTO users (id, name, role) VALUES (3, 'bob', 'user');
+```
+
+```sql
+-- seeds/002_seed_products.sql
+INSERT OR IGNORE INTO products (id, name, price) VALUES (1, 'Widget', 9.99);
+INSERT OR IGNORE INTO products (id, name, price) VALUES (2, 'Gadget', 24.99);
+INSERT OR IGNORE INTO products (id, name, price) VALUES (3, 'Gizmo', 49.99);
 ```
 
 ### 2. Run with the CLI
@@ -50,6 +58,7 @@ Output:
 
 ```
 applied: 001_seed_users.sql
+applied: 002_seed_products.sql
 ```
 
 ### 3. Or use as a Go library
