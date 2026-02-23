@@ -26,7 +26,11 @@ go get github.com/jian-hua-he/geeder
 
 ## Quick Start
 
-### 1. Create your seed files
+### 1. Create your tables
+
+Use any approach you prefer — raw SQL, an ORM, or a migration tool.
+
+### 2. Create your seed files
 
 ```
 seeds/
@@ -48,7 +52,7 @@ INSERT OR IGNORE INTO products (id, name, price) VALUES (2, 'Gadget', 24.99);
 INSERT OR IGNORE INTO products (id, name, price) VALUES (3, 'Gizmo', 49.99);
 ```
 
-### 2. Run with the CLI
+### 3. Run with the CLI
 
 ```bash
 geeder -dir ./seeds -driver sqlite -dsn ./app.db
@@ -61,7 +65,7 @@ applied: 001_seed_users.sql
 applied: 002_seed_products.sql
 ```
 
-### 3. Or use as a Go library
+### 4. Or use as a Go library
 
 ```go
 package main
