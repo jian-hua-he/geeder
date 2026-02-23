@@ -5,22 +5,33 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 )
 
 type mainConfig struct {
+	Dir    string
 	Driver string
 	DSN    string
 }
 
-func runMain(cfg mainConfig, fsys fs.FS) error {
+func runMain(cfg mainConfig) error {
+	if cfg.Dir == "" {
+		return fmt.Errorf("geeder: -dir flag is required")
+	}
 	if cfg.Driver == "" {
 		return fmt.Errorf("geeder: -driver flag is required")
 	}
 	if cfg.DSN == "" {
 		return fmt.Errorf("geeder: -dsn flag is required")
+	}
+
+	info, err := os.Stat(cfg.Dir)
+	if err != nil {
+		return fmt.Errorf("geeder: open seed directory: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("geeder: %s is not a directory", cfg.Dir)
 	}
 
 	db, err := sql.Open(cfg.Driver, cfg.DSN)
@@ -29,7 +40,7 @@ func runMain(cfg mainConfig, fsys fs.FS) error {
 	}
 	defer db.Close()
 
-	seeds, err := New(db, fsys).Run(context.Background())
+	seeds, err := New(db, os.DirFS(cfg.Dir)).Run(context.Background())
 	if err != nil {
 		return err
 	}
@@ -40,19 +51,21 @@ func runMain(cfg mainConfig, fsys fs.FS) error {
 	return nil
 }
 
-// Main is a convenience entry point for CLI usage.
-// The caller's main.go should embed seed files and pass the fs.FS to Main.
-func Main(fsys fs.FS) {
+// Main is a CLI entry point that reads .sql files from a directory and executes them.
+// It parses -dir, -driver, and -dsn flags from the command line.
+func Main() {
+	dir := flag.String("dir", "", "directory containing .sql seed files")
 	driver := flag.String("driver", "", "database driver name (e.g. sqlite, postgres, mysql)")
 	dsn := flag.String("dsn", "", "data source name / connection string")
 	flag.Parse()
 
 	cfg := mainConfig{
+		Dir:    *dir,
 		Driver: *driver,
 		DSN:    *dsn,
 	}
 
-	if err := runMain(cfg, fsys); err != nil {
+	if err := runMain(cfg); err != nil {
 		log.Fatal(err)
 	}
 }

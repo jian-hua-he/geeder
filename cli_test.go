@@ -2,7 +2,8 @@ package geeder
 
 import (
 	"database/sql"
-	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,19 +16,23 @@ func TestRunMain_Validation(t *testing.T) {
 		cfg     mainConfig
 		wantErr string
 	}{
+		"missing dir": {
+			cfg:     mainConfig{Driver: "sqlite", DSN: "foo"},
+			wantErr: "-dir flag is required",
+		},
 		"missing driver": {
-			cfg:     mainConfig{DSN: "foo"},
+			cfg:     mainConfig{Dir: "seeds", DSN: "foo"},
 			wantErr: "-driver flag is required",
 		},
 		"missing DSN": {
-			cfg:     mainConfig{Driver: "sqlite"},
+			cfg:     mainConfig{Dir: "seeds", Driver: "sqlite"},
 			wantErr: "-dsn flag is required",
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := runMain(tt.cfg, nil)
+			err := runMain(tt.cfg)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})
@@ -35,9 +40,9 @@ func TestRunMain_Validation(t *testing.T) {
 }
 
 func TestRunMain_ExecutesSeeds(t *testing.T) {
-	tmpFile := t.TempDir() + "/test.db"
+	tmpDB := t.TempDir() + "/test.db"
 
-	db, err := sql.Open("sqlite", tmpFile)
+	db, err := sql.Open("sqlite", tmpDB)
 	require.NoError(t, err)
 	_, err = db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)")
 	require.NoError(t, err)
@@ -45,17 +50,36 @@ func TestRunMain_ExecutesSeeds(t *testing.T) {
 	require.NoError(t, err)
 	db.Close()
 
-	fsys, err := fs.Sub(testSeeds, "testdata")
+	// Create a temp seeds directory with .sql files
+	seedDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(seedDir, "001_users.sql"),
+		[]byte("INSERT INTO users (name, role) VALUES ('alice', 'admin');"),
+		0644,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(seedDir, "002_products.sql"),
+		[]byte("INSERT INTO products (name, price) VALUES ('widget', 9.99);"),
+		0644,
+	))
+
+	err = runMain(mainConfig{Dir: seedDir, Driver: "sqlite", DSN: tmpDB})
 	require.NoError(t, err)
 
-	err = runMain(mainConfig{Driver: "sqlite", DSN: tmpFile}, fsys)
-	require.NoError(t, err)
-
-	db, err = sql.Open("sqlite", tmpFile)
+	db, err = sql.Open("sqlite", tmpDB)
 	require.NoError(t, err)
 	defer db.Close()
 
 	var count int
 	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count))
 	assert.Equal(t, 1, count)
+
+	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM products").Scan(&count))
+	assert.Equal(t, 1, count)
+}
+
+func TestRunMain_NonexistentDir(t *testing.T) {
+	err := runMain(mainConfig{Dir: "/nonexistent/path", Driver: "sqlite", DSN: ":memory:"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "open seed directory")
 }

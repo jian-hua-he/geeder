@@ -1,10 +1,24 @@
 # geeder
 
-A lightweight Go package for seeding databases with raw SQL files. Place your `.sql` files in a directory, embed them with `//go:embed`, and geeder executes them in alphabetical order within a single transaction.
+A lightweight Go tool for seeding databases with raw SQL files. Place your `.sql` files in a directory and geeder executes them in alphabetical order within a single transaction.
 
 Works with any `database/sql`-compatible driver (PostgreSQL, MySQL, SQLite, etc.).
 
 ## Installation
+
+### CLI (no Go required)
+
+```bash
+go install github.com/jian-hua-he/geeder/cmd/geeder@latest
+```
+
+Then run it against any directory of `.sql` files:
+
+```bash
+geeder -dir ./seeds -driver postgres -dsn "postgres://user:pass@localhost/mydb"
+```
+
+### Library
 
 ```bash
 go get github.com/jian-hua-he/geeder
@@ -35,7 +49,20 @@ INSERT OR IGNORE INTO users (id, name, role) VALUES (1, 'admin', 'admin');
 INSERT OR IGNORE INTO users (id, name, role) VALUES (2, 'alice', 'user');
 ```
 
-### 2. Use as a library
+### 2. Run with the CLI
+
+```bash
+geeder -dir ./seeds -driver sqlite -dsn ./app.db
+```
+
+Output:
+
+```
+applied: 001_create_users.sql
+applied: 002_seed_users.sql
+```
+
+### 3. Or use as a Go library
 
 ```go
 package main
@@ -73,34 +100,10 @@ func main() {
 }
 ```
 
-### 3. Or use as a CLI
+You can also use `os.DirFS` to read from a directory at runtime:
 
 ```go
-package main
-
-import (
-	"embed"
-	"io/fs"
-	"log"
-
-	"github.com/jian-hua-he/geeder"
-	_ "modernc.org/sqlite"
-)
-
-//go:embed seeds/*.sql
-var seedFiles embed.FS
-
-func main() {
-	seedFS, err := fs.Sub(seedFiles, "seeds")
-	if err != nil {
-		log.Fatal(err)
-	}
-	geeder.Main(seedFS)
-}
-```
-
-```bash
-go run main.go -driver sqlite -dsn ./app.db
+seeds, err := geeder.New(db, os.DirFS("./seeds")).Run(ctx)
 ```
 
 ## API
@@ -116,8 +119,8 @@ geeder.New(db *sql.DB, fsys fs.FS) *Seeder
 // Returns the list of seeds that were applied.
 (s *Seeder) Run(ctx context.Context) ([]Seed, error)
 
-// Main is a CLI helper that parses -driver and -dsn flags, then runs seeds.
-geeder.Main(fsys fs.FS)
+// Main is a CLI entry point that parses -dir, -driver, and -dsn flags.
+geeder.Main()
 ```
 
 ### Types
@@ -131,22 +134,22 @@ type Seed struct {
 
 ## How It Works
 
-1. Geeder reads all `*.sql` files from the provided `fs.FS`
+1. Geeder reads all `*.sql` files from the provided `fs.FS` (or directory via CLI)
 2. Files are sorted alphabetically — use a naming convention like `001_`, `002_` to control order
 3. All SQL is executed in a **single transaction** — if any file fails, the entire batch is rolled back
-4. Seeds run every time `Run()` is called — write idempotent SQL (e.g. `CREATE TABLE IF NOT EXISTS`, `INSERT OR IGNORE`)
+4. Seeds run every time — write idempotent SQL (e.g. `CREATE TABLE IF NOT EXISTS`, `INSERT OR IGNORE`)
 
 ## Examples
 
-See the [`examples/`](examples/) directory for runnable examples:
+See the [`examples/`](examples/) directory:
 
 - **[library](examples/library/)** — Use geeder as a Go library with embedded SQL files
-- **[cli](examples/cli/)** — Build a CLI seeder binary with `geeder.Main()`
 
 ## CLI Flags
 
 | Flag | Description | Example |
 |---|---|---|
+| `-dir` | Directory containing `.sql` seed files | `./seeds` |
 | `-driver` | Database driver name | `sqlite`, `postgres`, `mysql` |
 | `-dsn` | Data source name / connection string | `./app.db`, `postgres://user:pass@localhost/db` |
 

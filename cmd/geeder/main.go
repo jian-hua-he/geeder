@@ -1,14 +1,7 @@
 package main
 
-import (
-	"embed"
-
-	"github.com/jian-hua-he/geeder"
-)
-
-//go:embed seeds/*.sql
-var seeds embed.FS
+import "github.com/jian-hua-he/geeder"
 
 func main() {
-	geeder.Main(seeds)
+	geeder.Main()
 }
