@@ -1,6 +1,6 @@
 # geeder
 
-A lightweight Go package for seeding databases with raw SQL. Seeds are registered programmatically in Go code, executed transactionally, and tracked in a `geeder_seeds` table so they never run twice.
+A lightweight Go package for seeding databases with raw SQL files. Place your `.sql` files in a directory, embed them with `//go:embed`, and geeder executes them in alphabetical order within a single transaction.
 
 Works with any `database/sql`-compatible driver (PostgreSQL, MySQL, SQLite, etc.).
 
@@ -12,7 +12,30 @@ go get github.com/jian-hua-he/geeder
 
 ## Quick Start
 
-### As a library
+### 1. Create your seed files
+
+```
+seeds/
+├── 001_create_users.sql
+└── 002_seed_users.sql
+```
+
+```sql
+-- seeds/001_create_users.sql
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user'
+);
+```
+
+```sql
+-- seeds/002_seed_users.sql
+INSERT OR IGNORE INTO users (id, name, role) VALUES (1, 'admin', 'admin');
+INSERT OR IGNORE INTO users (id, name, role) VALUES (2, 'alice', 'user');
+```
+
+### 2. Use as a library
 
 ```go
 package main
@@ -20,11 +43,16 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
+	"io/fs"
 	"log"
 
 	"github.com/jian-hua-he/geeder"
 	_ "modernc.org/sqlite"
 )
+
+//go:embed seeds/*.sql
+var seedFiles embed.FS
 
 func main() {
 	db, err := sql.Open("sqlite", "app.db")
@@ -33,136 +61,86 @@ func main() {
 	}
 	defer db.Close()
 
-	geeder.Register("001_create_users_table", `
-		CREATE TABLE IF NOT EXISTS users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			role TEXT NOT NULL DEFAULT 'user'
-		)
-	`)
-	geeder.Register("002_seed_admin", "INSERT INTO users (name, role) VALUES ('admin', 'admin')")
-	geeder.Register("003_seed_default_users", `
-		INSERT INTO users (name) VALUES ('alice');
-		INSERT INTO users (name) VALUES ('bob');
-	`)
-
-	result, err := geeder.New(db).Run(context.Background())
+	seedFS, _ := fs.Sub(seedFiles, "seeds")
+	seeds, err := geeder.New(db, seedFS).Run(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, name := range result.Applied {
-		log.Printf("applied: %s", name)
-	}
-	for _, name := range result.Skipped {
-		log.Printf("skipped: %s", name)
+	for _, s := range seeds {
+		log.Printf("applied: %s", s.Name)
 	}
 }
 ```
 
-### As a CLI
-
-Build a custom binary that imports your seeds, then run it with flags:
+### 3. Or use as a CLI
 
 ```go
 package main
 
 import (
+	"embed"
+	"io/fs"
+	"log"
+
 	"github.com/jian-hua-he/geeder"
-	_ "myapp/seeds" // triggers init() → geeder.Register() calls
+	_ "modernc.org/sqlite"
 )
 
+//go:embed seeds/*.sql
+var seedFiles embed.FS
+
 func main() {
-	geeder.Main()
+	seedFS, err := fs.Sub(seedFiles, "seeds")
+	if err != nil {
+		log.Fatal(err)
+	}
+	geeder.Main(seedFS)
 }
 ```
 
 ```bash
-# Run seeds
-./myseeder -driver sqlite -dsn ./app.db
-
-# Check status
-./myseeder -driver sqlite -dsn ./app.db -status
+go run main.go -driver sqlite -dsn ./app.db
 ```
 
 ## API
 
-### Register seeds
+### Core
 
 ```go
-// Register a seed with a unique name and raw SQL.
-// Panics if name or sql is empty, or if the name is already registered.
-geeder.Register(name string, sql string)
+// New creates a Seeder that reads .sql files from the given fs.FS.
+// Files are sorted alphabetically by name.
+geeder.New(db *sql.DB, fsys fs.FS) *Seeder
 
-// Get all registered seeds (returns a copy in registration order).
-geeder.Seeds() []geeder.Seed
-```
+// Run executes all .sql files in a single transaction.
+// Returns the list of seeds that were applied.
+(s *Seeder) Run(ctx context.Context) ([]Seed, error)
 
-Seeds are executed in **registration order**, giving you explicit control over dependencies.
-
-### Execute seeds
-
-```go
-// Create a seeder with a database connection.
-s := geeder.New(db)
-
-// Run all registered seeds that haven't been executed yet.
-result, err := s.Run(ctx)
-
-// Or run a specific list of seeds (ignores the global registry).
-result, err := s.RunSeeds(ctx, []geeder.Seed{
-    {Name: "custom_seed", SQL: "INSERT INTO ..."},
-})
-```
-
-All pending seeds run in a **single transaction**. If any seed fails, the entire batch is rolled back and nothing is tracked.
-
-### Check status
-
-```go
-records, err := s.Status(ctx)
-for _, r := range records {
-    fmt.Printf("%s executed at %s\n", r.Name, r.ExecutedAt)
-}
+// Main is a CLI helper that parses -driver and -dsn flags, then runs seeds.
+geeder.Main(fsys fs.FS)
 ```
 
 ### Types
 
 ```go
 type Seed struct {
-    Name string
-    SQL  string
-}
-
-type Result struct {
-    Applied []string // seeds executed in this run
-    Skipped []string // seeds already executed previously
-}
-
-type SeedRecord struct {
-    Name       string
-    ExecutedAt time.Time
+    Name string // filename, e.g. "001_create_users.sql"
+    SQL  string // file contents
 }
 ```
 
-## How Tracking Works
+## How It Works
 
-Geeder automatically creates a `geeder_seeds` table in your database:
-
-```sql
-CREATE TABLE IF NOT EXISTS geeder_seeds (
-    name VARCHAR(255) PRIMARY KEY,
-    executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-)
-```
-
-Each time a seed is applied, its name is recorded in this table within the same transaction as the seed SQL. On subsequent runs, already-executed seeds are skipped.
+1. Geeder reads all `*.sql` files from the provided `fs.FS`
+2. Files are sorted alphabetically — use a naming convention like `001_`, `002_` to control order
+3. All SQL is executed in a **single transaction** — if any file fails, the entire batch is rolled back
+4. Seeds run every time `Run()` is called — write idempotent SQL (e.g. `CREATE TABLE IF NOT EXISTS`, `INSERT OR IGNORE`)
 
 ## Examples
 
 See the [`examples/`](examples/) directory for runnable examples:
 
-- **[library](examples/library/)** — Use geeder as a Go library in your application
+- **[library](examples/library/)** — Use geeder as a Go library with embedded SQL files
 - **[cli](examples/cli/)** — Build a CLI seeder binary with `geeder.Main()`
 
 ## CLI Flags
@@ -171,7 +149,6 @@ See the [`examples/`](examples/) directory for runnable examples:
 |---|---|---|
 | `-driver` | Database driver name | `sqlite`, `postgres`, `mysql` |
 | `-dsn` | Data source name / connection string | `./app.db`, `postgres://user:pass@localhost/db` |
-| `-status` | Show executed seeds instead of running | (boolean flag) |
 
 ## License
 

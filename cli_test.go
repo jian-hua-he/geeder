@@ -2,6 +2,7 @@ package geeder
 
 import (
 	"database/sql"
+	"io/fs"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,15 +39,16 @@ func TestRunMain_ExecutesSeeds(t *testing.T) {
 
 	db, err := sql.Open("sqlite", tmpFile)
 	require.NoError(t, err)
-	_, err = db.Exec("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+	_, err = db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)")
+	require.NoError(t, err)
+	_, err = db.Exec("CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, price REAL NOT NULL)")
 	require.NoError(t, err)
 	db.Close()
 
-	seeds := []Seed{
-		{Name: "add_item", SQL: "INSERT INTO items (name) VALUES ('widget')"},
-	}
+	fsys, err := fs.Sub(testSeeds, "testdata")
+	require.NoError(t, err)
 
-	err = runMain(mainConfig{Driver: "sqlite", DSN: tmpFile}, seeds)
+	err = runMain(mainConfig{Driver: "sqlite", DSN: tmpFile}, fsys)
 	require.NoError(t, err)
 
 	db, err = sql.Open("sqlite", tmpFile)
@@ -54,28 +56,6 @@ func TestRunMain_ExecutesSeeds(t *testing.T) {
 	defer db.Close()
 
 	var count int
-	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM items").Scan(&count))
+	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count))
 	assert.Equal(t, 1, count)
-}
-
-func TestRunMain_StatusMode(t *testing.T) {
-	tmpFile := t.TempDir() + "/test.db"
-
-	db, err := sql.Open("sqlite", tmpFile)
-	require.NoError(t, err)
-	_, err = db.Exec("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
-	require.NoError(t, err)
-	db.Close()
-
-	seeds := []Seed{
-		{Name: "add_item", SQL: "INSERT INTO items (name) VALUES ('widget')"},
-	}
-
-	// Run seeds first
-	err = runMain(mainConfig{Driver: "sqlite", DSN: tmpFile}, seeds)
-	require.NoError(t, err)
-
-	// Status mode should not error
-	err = runMain(mainConfig{Driver: "sqlite", DSN: tmpFile, Status: true}, nil)
-	assert.NoError(t, err)
 }

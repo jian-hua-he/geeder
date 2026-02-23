@@ -1,7 +1,6 @@
-// Example: using geeder as a Go library.
+// Example: using geeder as a Go library with embedded SQL files.
 //
-// This example creates an in-memory SQLite database, registers seeds,
-// and runs them. Run it with:
+// Run with:
 //
 //	go run main.go
 package main
@@ -9,12 +8,17 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 
 	"github.com/jian-hua-he/geeder"
 	_ "modernc.org/sqlite"
 )
+
+//go:embed seeds/*.sql
+var seedFiles embed.FS
 
 func main() {
 	db, err := sql.Open("sqlite", ":memory:")
@@ -23,54 +27,25 @@ func main() {
 	}
 	defer db.Close()
 
-	// Create the target table (in real apps this is done by migrations).
-	if _, err := db.Exec(`
-		CREATE TABLE users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			role TEXT NOT NULL DEFAULT 'user'
-		)
-	`); err != nil {
-		log.Fatal(err)
-	}
-
-	// Register seeds in the order you want them executed.
-	geeder.Register("001_admin_user", "INSERT INTO users (name, role) VALUES ('admin', 'admin')")
-	geeder.Register("002_default_users", "INSERT INTO users (name) VALUES ('alice')")
-	geeder.Register("003_more_users", "INSERT INTO users (name) VALUES ('bob')")
-
-	ctx := context.Background()
-	s := geeder.New(db)
-
-	// First run: all seeds are applied.
-	fmt.Println("=== First run ===")
-	result, err := s.Run(ctx)
+	// fs.Sub strips the "seeds/" prefix so geeder sees *.sql at root level.
+	seedFS, err := fs.Sub(seedFiles, "seeds")
 	if err != nil {
 		log.Fatal(err)
 	}
-	printResult(result)
 
-	// Second run: all seeds are skipped (idempotent).
-	fmt.Println("\n=== Second run ===")
-	result, err = s.Run(ctx)
+	seeds, err := geeder.New(db, seedFS).Run(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
-	printResult(result)
 
-	// Check status.
-	fmt.Println("\n=== Status ===")
-	records, err := s.Status(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, r := range records {
-		fmt.Printf("  %s  (executed at %s)\n", r.Name, r.ExecutedAt.Format("2006-01-02 15:04:05"))
+	fmt.Println("=== Applied seeds ===")
+	for _, s := range seeds {
+		fmt.Printf("  %s\n", s.Name)
 	}
 
 	// Verify data.
 	fmt.Println("\n=== Users in database ===")
-	rows, err := db.QueryContext(ctx, "SELECT id, name, role FROM users ORDER BY id")
+	rows, err := db.Query("SELECT id, name, role FROM users ORDER BY id")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,17 +57,5 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Printf("  %d: %s (%s)\n", id, name, role)
-	}
-}
-
-func printResult(r *geeder.Result) {
-	for _, name := range r.Applied {
-		fmt.Printf("  applied: %s\n", name)
-	}
-	for _, name := range r.Skipped {
-		fmt.Printf("  skipped: %s\n", name)
-	}
-	if len(r.Applied) == 0 && len(r.Skipped) == 0 {
-		fmt.Println("  (nothing to do)")
 	}
 }
