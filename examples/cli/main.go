@@ -10,10 +10,10 @@
 package main
 
 import (
-	"github.com/jianhuahe/geeder"
+	"github.com/jian-hua-he/geeder"
 
 	// Import your seeds package to trigger init() registrations.
-	_ "github.com/jianhuahe/geeder/examples/cli/seeds"
+	_ "github.com/jian-hua-he/geeder/examples/cli/seeds"
 
 	// Import the database driver you need.
 	_ "modernc.org/sqlite"

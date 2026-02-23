@@ -1,6 +1,6 @@
 package main
 
-import "github.com/jianhuahe/geeder"
+import "github.com/jian-hua-he/geeder"
 
 func main() {
 	geeder.Main()

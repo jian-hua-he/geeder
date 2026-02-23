@@ -5,7 +5,7 @@
 //	import _ "myapp/seeds"
 package seeds
 
-import "github.com/jianhuahe/geeder"
+import "github.com/jian-hua-he/geeder"
 
 func init() {
 	geeder.Register("001_create_products_table", `

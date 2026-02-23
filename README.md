@@ -7,7 +7,7 @@ Works with any `database/sql`-compatible driver (PostgreSQL, MySQL, SQLite, etc.
 ## Installation
 
 ```bash
-go get github.com/jianhuahe/geeder
+go get github.com/jian-hua-he/geeder
 ```
 
 ## Quick Start
@@ -22,7 +22,7 @@ import (
 	"database/sql"
 	"log"
 
-	"github.com/jianhuahe/geeder"
+	"github.com/jian-hua-he/geeder"
 	_ "modernc.org/sqlite"
 )
 
@@ -68,7 +68,7 @@ Build a custom binary that imports your seeds, then run it with flags:
 package main
 
 import (
-	"github.com/jianhuahe/geeder"
+	"github.com/jian-hua-he/geeder"
 	_ "myapp/seeds" // triggers init() → geeder.Register() calls
 )
 

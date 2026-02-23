@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/jianhuahe/geeder"
+	"github.com/jian-hua-he/geeder"
 	_ "modernc.org/sqlite"
 )
 

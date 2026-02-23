@@ -1,4 +1,4 @@
-module github.com/jianhuahe/geeder
+module github.com/jian-hua-he/geeder
 
 go 1.25.0
 
