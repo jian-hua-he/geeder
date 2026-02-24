@@ -8,10 +8,15 @@ import (
 	"sort"
 )
 
-// Seed represents a single seed file.
+// Seed represents an applied seed file.
 type Seed struct {
 	Name string // filename, e.g. "001_create_users.sql"
-	SQL  string // file contents
+}
+
+// loadedSeed is the internal representation with SQL content for execution.
+type loadedSeed struct {
+	name string
+	sql  string
 }
 
 // Seeder manages seed execution against a database.
@@ -29,12 +34,12 @@ func New(db *sql.DB, fsys fs.FS) *Seeder {
 // Run executes all .sql files found in the FS.
 // All seeds run in a single transaction. If any seed fails, the entire batch is rolled back.
 func (s *Seeder) Run(ctx context.Context) ([]Seed, error) {
-	seeds, err := s.loadSeeds()
+	loaded, err := s.loadSeeds()
 	if err != nil {
 		return nil, fmt.Errorf("geeder: load seeds: %w", err)
 	}
 
-	if len(seeds) == 0 {
+	if len(loaded) == 0 {
 		return nil, nil
 	}
 
@@ -44,10 +49,12 @@ func (s *Seeder) Run(ctx context.Context) ([]Seed, error) {
 	}
 	defer tx.Rollback()
 
-	for _, seed := range seeds {
-		if _, err := tx.ExecContext(ctx, seed.SQL); err != nil {
-			return nil, fmt.Errorf("geeder: execute seed %q: %w", seed.Name, err)
+	seeds := make([]Seed, 0, len(loaded))
+	for _, l := range loaded {
+		if _, err := tx.ExecContext(ctx, l.sql); err != nil {
+			return nil, fmt.Errorf("geeder: execute seed %q: %w", l.name, err)
 		}
+		seeds = append(seeds, Seed{Name: l.name})
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -57,7 +64,7 @@ func (s *Seeder) Run(ctx context.Context) ([]Seed, error) {
 	return seeds, nil
 }
 
-func (s *Seeder) loadSeeds() ([]Seed, error) {
+func (s *Seeder) loadSeeds() ([]loadedSeed, error) {
 	matches, err := fs.Glob(s.fsys, "*.sql")
 	if err != nil {
 		return nil, err
@@ -65,13 +72,13 @@ func (s *Seeder) loadSeeds() ([]Seed, error) {
 
 	sort.Strings(matches)
 
-	seeds := make([]Seed, 0, len(matches))
+	seeds := make([]loadedSeed, 0, len(matches))
 	for _, name := range matches {
 		data, err := fs.ReadFile(s.fsys, name)
 		if err != nil {
 			return nil, fmt.Errorf("read %q: %w", name, err)
 		}
-		seeds = append(seeds, Seed{Name: name, SQL: string(data)})
+		seeds = append(seeds, loadedSeed{name: name, sql: string(data)})
 	}
 
 	return seeds, nil

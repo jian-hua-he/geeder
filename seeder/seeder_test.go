@@ -3,7 +3,6 @@ package seeder_test
 import (
 	"database/sql"
 	"embed"
-	"fmt"
 	"io/fs"
 	"testing"
 	"testing/fstest"
@@ -25,63 +24,54 @@ func TestSeeder_Run(t *testing.T) {
 	good, _ := fs.Sub(goodSeeds, "testdata/good")
 	bad, _ := fs.Sub(badSeeds, "testdata/bad")
 
-	tests := map[string]struct {
+	testCases := map[string]struct {
 		fsys      fs.FS
-		ddl       []string
 		wantErr   bool
-		wantSeeds []string
-		wantRows  map[string]int
+		wantSeeds []seeder.Seed
+		wantCount int
 	}{
 		"applies seeds in alphabetical order": {
 			fsys: good,
-			ddl: []string{
-				"CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)",
-				"CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, price REAL NOT NULL)",
+			wantSeeds: []seeder.Seed{
+				{Name: "001_users.sql"},
+				{Name: "002_users.sql"},
 			},
-			wantSeeds: []string{"001_users.sql", "002_products.sql"},
-			wantRows:  map[string]int{"users": 1, "products": 1},
+			wantCount: 2,
 		},
 		"empty filesystem returns no seeds": {
 			fsys: fstest.MapFS{},
 		},
 		"rolls back all seeds on bad SQL": {
-			fsys: bad,
-			ddl: []string{
-				"CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)",
-			},
-			wantErr:  true,
-			wantRows: map[string]int{"users": 0},
+			fsys:    bad,
+			wantErr: true,
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			db, err := sql.Open("sqlite", ":memory:")
 			require.NoError(t, err)
 			defer db.Close()
 
-			for _, stmt := range tt.ddl {
-				_, err := db.Exec(stmt)
-				require.NoError(t, err)
-			}
+			_, err = db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)")
+			require.NoError(t, err)
 
-			seeds, err := seeder.New(db, tt.fsys).Run(t.Context())
+			s := seeder.New(db, tc.fsys)
+			seeds, err := s.Run(t.Context())
 
-			if tt.wantErr {
-				require.Error(t, err)
+			if tc.wantErr {
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
-				require.Len(t, seeds, len(tt.wantSeeds))
-				for i, name := range tt.wantSeeds {
-					assert.Equal(t, name, seeds[i].Name)
-				}
+				assert.NoError(t, err)
 			}
 
-			for table, want := range tt.wantRows {
-				var count int
-				require.NoError(t, db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", table)).Scan(&count))
-				assert.Equal(t, want, count, "row count for %s", table)
-			}
+			assert.EqualValues(t, tc.wantSeeds, seeds)
+
+			var count int
+			err = db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+			require.NoError(t, err)
+
+			assert.EqualValues(t, tc.wantCount, count)
 		})
 	}
 }
@@ -92,8 +82,6 @@ func TestSeeder_Run_ExecutesEveryTime(t *testing.T) {
 	defer db.Close()
 
 	_, err = db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)")
-	require.NoError(t, err)
-	_, err = db.Exec("CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, price REAL NOT NULL)")
 	require.NoError(t, err)
 
 	fsys, err := fs.Sub(goodSeeds, "testdata/good")
@@ -109,5 +97,5 @@ func TestSeeder_Run_ExecutesEveryTime(t *testing.T) {
 
 	var count int
 	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count))
-	assert.Equal(t, 2, count, "seeds run every invocation, no tracking")
+	assert.Equal(t, 4, count, "seeds run every invocation, no tracking")
 }

@@ -21,7 +21,7 @@ geeder -dir ./seeds -driver postgres -dsn "postgres://user:pass@localhost/mydb"
 ### Library
 
 ```bash
-go get github.com/jian-hua-he/geeder
+go get github.com/jian-hua-he/geeder/seeder
 ```
 
 ## Quick Start
@@ -77,7 +77,7 @@ import (
 	"io/fs"
 	"log"
 
-	"github.com/jian-hua-he/geeder"
+	"github.com/jian-hua-he/geeder/seeder"
 	_ "modernc.org/sqlite"
 )
 
@@ -95,7 +95,7 @@ func main() {
 	// db.Exec(`CREATE TABLE IF NOT EXISTS users (...)`)
 
 	seedFS, _ := fs.Sub(seedFiles, "seeds")
-	seeds, err := geeder.New(db, seedFS).Run(context.Background())
+	seeds, err := seeder.New(db, seedFS).Run(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func main() {
 You can also use `os.DirFS` to read from a directory at runtime:
 
 ```go
-seeds, err := geeder.New(db, os.DirFS("./seeds")).Run(ctx)
+seeds, err := seeder.New(db, os.DirFS("./seeds")).Run(ctx)
 ```
 
 ## API
@@ -119,14 +119,18 @@ seeds, err := geeder.New(db, os.DirFS("./seeds")).Run(ctx)
 ```go
 // New creates a Seeder that reads .sql files from the given fs.FS.
 // Files are sorted alphabetically by name.
-geeder.New(db *sql.DB, fsys fs.FS) *Seeder
+seeder.New(db *sql.DB, fsys fs.FS) *Seeder
 
 // Run executes all .sql files in a single transaction.
 // Returns the list of seeds that were applied.
 (s *Seeder) Run(ctx context.Context) ([]Seed, error)
+```
 
-// Main is a CLI entry point that parses -dir, -driver, and -dsn flags.
-geeder.Main()
+### CLI
+
+```go
+// Run parses -dir, -driver, and -dsn flags and executes seed files.
+cli.Run(args []string) error
 ```
 
 ### Types
@@ -134,7 +138,6 @@ geeder.Main()
 ```go
 type Seed struct {
     Name string // filename, e.g. "001_create_users.sql"
-    SQL  string // file contents
 }
 ```
 
