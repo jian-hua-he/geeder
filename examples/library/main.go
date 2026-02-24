@@ -13,7 +13,7 @@ import (
 	"io/fs"
 	"log"
 
-	"github.com/jian-hua-he/geeder"
+	"github.com/jian-hua-he/geeder/seeder"
 	_ "modernc.org/sqlite"
 )
 
@@ -51,7 +51,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	seeds, err := geeder.New(db, seedFS).Run(context.Background())
+	seeds, err := seeder.New(db, seedFS).Run(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-package geeder_test
+package seeder_test
 
 import (
 	"database/sql"
@@ -8,10 +8,11 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/jian-hua-he/geeder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
+
+	"github.com/jian-hua-he/geeder/seeder"
 )
 
 //go:embed testdata/good/*.sql
@@ -19,15 +20,6 @@ var goodSeeds embed.FS
 
 //go:embed testdata/bad/*.sql
 var badSeeds embed.FS
-
-func TestNew(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	require.NoError(t, err)
-	defer db.Close()
-
-	s := geeder.New(db, fstest.MapFS{})
-	assert.NotNil(t, s)
-}
 
 func TestSeeder_Run(t *testing.T) {
 	good, _ := fs.Sub(goodSeeds, "testdata/good")
@@ -73,7 +65,7 @@ func TestSeeder_Run(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			seeds, err := geeder.New(db, tt.fsys).Run(t.Context())
+			seeds, err := seeder.New(db, tt.fsys).Run(t.Context())
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -107,7 +99,7 @@ func TestSeeder_Run_ExecutesEveryTime(t *testing.T) {
 	fsys, err := fs.Sub(goodSeeds, "testdata/good")
 	require.NoError(t, err)
 
-	s := geeder.New(db, fsys)
+	s := seeder.New(db, fsys)
 
 	_, err = s.Run(t.Context())
 	require.NoError(t, err)

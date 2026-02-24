@@ -1,4 +1,4 @@
-package geeder
+package seeder
 
 import (
 	"context"
