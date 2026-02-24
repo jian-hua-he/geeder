@@ -50,7 +50,6 @@ func TestRunMain_ExecutesSeeds(t *testing.T) {
 	require.NoError(t, err)
 	db.Close()
 
-	// Create a temp seeds directory with .sql files
 	seedDir := t.TempDir()
 	require.NoError(t, os.WriteFile(
 		filepath.Join(seedDir, "001_users.sql"),
@@ -78,37 +77,52 @@ func TestRunMain_ExecutesSeeds(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
-func TestMain_EnvFallback(t *testing.T) {
-	tmpDB := t.TempDir() + "/test.db"
+func TestRunMain_EnvFallback(t *testing.T) {
+	t.Run("env vars are used when flags are empty", func(t *testing.T) {
+		tmpDB := t.TempDir() + "/test.db"
 
-	db, err := sql.Open("sqlite", tmpDB)
-	require.NoError(t, err)
-	_, err = db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)")
-	require.NoError(t, err)
-	db.Close()
+		db, err := sql.Open("sqlite", tmpDB)
+		require.NoError(t, err)
+		_, err = db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)")
+		require.NoError(t, err)
+		db.Close()
 
-	seedDir := t.TempDir()
-	require.NoError(t, os.WriteFile(
-		filepath.Join(seedDir, "001_users.sql"),
-		[]byte("INSERT INTO users (name, role) VALUES ('alice', 'admin');"),
-		0644,
-	))
+		seedDir := t.TempDir()
+		require.NoError(t, os.WriteFile(
+			filepath.Join(seedDir, "001_users.sql"),
+			[]byte("INSERT INTO users (name, role) VALUES ('alice', 'admin');"),
+			0644,
+		))
 
-	t.Run("GEEDER_* env vars", func(t *testing.T) {
 		t.Setenv("GEEDER_DIR", seedDir)
 		t.Setenv("GEEDER_DRIVER", "sqlite")
 		t.Setenv("GEEDER_DSN", tmpDB)
 
-		err := runMain(mainConfig{})
+		err = runMain(mainConfig{})
 		require.NoError(t, err)
 	})
 
 	t.Run("flags take precedence over env", func(t *testing.T) {
+		tmpDB := t.TempDir() + "/test.db"
+
+		db, err := sql.Open("sqlite", tmpDB)
+		require.NoError(t, err)
+		_, err = db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)")
+		require.NoError(t, err)
+		db.Close()
+
+		seedDir := t.TempDir()
+		require.NoError(t, os.WriteFile(
+			filepath.Join(seedDir, "001_users.sql"),
+			[]byte("INSERT INTO users (name, role) VALUES ('alice', 'admin');"),
+			0644,
+		))
+
 		t.Setenv("GEEDER_DIR", "/nonexistent")
 		t.Setenv("GEEDER_DRIVER", "bad")
 		t.Setenv("GEEDER_DSN", "bad")
 
-		err := runMain(mainConfig{Dir: seedDir, Driver: "sqlite", DSN: tmpDB})
+		err = runMain(mainConfig{Dir: seedDir, Driver: "sqlite", DSN: tmpDB})
 		require.NoError(t, err)
 	})
 }
