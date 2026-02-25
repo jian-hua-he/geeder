@@ -110,41 +110,11 @@ You can also use `os.DirFS` to read from a directory at runtime:
 seeds, err := seeder.New(db, os.DirFS("./seeds")).Run(ctx)
 ```
 
-## API
-
-### Core
-
-```go
-// New creates a Seeder that reads .sql files from the given fs.FS.
-// Files are sorted alphabetically by name.
-seeder.New(db *sql.DB, fsys fs.FS) *Seeder
-
-// Run executes all .sql files in a single transaction.
-// Returns the list of seeds that were applied.
-(s *Seeder) Run(ctx context.Context) ([]Seed, error)
-```
-
-### CLI
-
-```go
-// Run parses -dir, -driver, and -dsn flags and executes seed files.
-cli.Run(args []string) error
-```
-
-### Types
-
-```go
-type Seed struct {
-    Name string // filename, e.g. "001_create_users.sql"
-}
-```
-
 ## How It Works
 
 1. Geeder reads all `*.sql` files from the provided `fs.FS` (or directory via CLI)
 2. Files are sorted alphabetically — use a naming convention like `001_`, `002_` to control order
 3. All SQL is executed in a **single transaction** — if any file fails, the entire batch is rolled back
-4. Seeds run every time — write idempotent SQL (e.g. `INSERT OR IGNORE`, `ON CONFLICT DO NOTHING`)
 
 ## Examples
 
