@@ -10,7 +10,6 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"io/fs"
 	"log"
 
 	"github.com/jian-hua-he/geeder/seeder"
@@ -45,13 +44,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// fs.Sub strips the "seeds/" prefix so geeder sees *.sql at root level.
-	seedFS, err := fs.Sub(seedFiles, "seeds")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	seeds, err := seeder.New(db, seedFS).Run(context.Background())
+	seeds, err := seeder.New(db, seedFiles).Run(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}

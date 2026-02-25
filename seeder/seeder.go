@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"io/fs"
+	"path"
 	"sort"
+	"strings"
 )
 
 // Seed represents an applied seed file.
@@ -65,20 +67,31 @@ func (s *Seeder) Run(ctx context.Context) ([]Seed, error) {
 }
 
 func (s *Seeder) loadSeeds() ([]loadedSeed, error) {
-	matches, err := fs.Glob(s.fsys, "*.sql")
+	var paths []string
+	err := fs.WalkDir(s.fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.HasSuffix(p, ".sql") {
+			paths = append(paths, p)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	sort.Strings(matches)
+	sort.Slice(paths, func(i, j int) bool {
+		return path.Base(paths[i]) < path.Base(paths[j])
+	})
 
-	seeds := make([]loadedSeed, 0, len(matches))
-	for _, name := range matches {
-		data, err := fs.ReadFile(s.fsys, name)
+	seeds := make([]loadedSeed, 0, len(paths))
+	for _, p := range paths {
+		data, err := fs.ReadFile(s.fsys, p)
 		if err != nil {
-			return nil, fmt.Errorf("read %q: %w", name, err)
+			return nil, fmt.Errorf("read %q: %w", p, err)
 		}
-		seeds = append(seeds, loadedSeed{name: name, sql: string(data)})
+		seeds = append(seeds, loadedSeed{name: path.Base(p), sql: string(data)})
 	}
 
 	return seeds, nil

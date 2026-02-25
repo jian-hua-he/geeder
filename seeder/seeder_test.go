@@ -21,9 +21,6 @@ var goodSeeds embed.FS
 var badSeeds embed.FS
 
 func TestSeeder_Run(t *testing.T) {
-	good, _ := fs.Sub(goodSeeds, "testdata/good")
-	bad, _ := fs.Sub(badSeeds, "testdata/bad")
-
 	testCases := map[string]struct {
 		fsys      fs.FS
 		wantErr   bool
@@ -31,7 +28,7 @@ func TestSeeder_Run(t *testing.T) {
 		wantCount int
 	}{
 		"applies seeds in alphabetical order": {
-			fsys: good,
+			fsys: goodSeeds,
 			wantSeeds: []seeder.Seed{
 				{Name: "001_users.sql"},
 				{Name: "002_users.sql"},
@@ -42,7 +39,7 @@ func TestSeeder_Run(t *testing.T) {
 			fsys: fstest.MapFS{},
 		},
 		"rolls back all seeds on bad SQL": {
-			fsys:    bad,
+			fsys:    badSeeds,
 			wantErr: true,
 		},
 	}
@@ -84,10 +81,7 @@ func TestSeeder_Run_ExecutesEveryTime(t *testing.T) {
 	_, err = db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL)")
 	require.NoError(t, err)
 
-	fsys, err := fs.Sub(goodSeeds, "testdata/good")
-	require.NoError(t, err)
-
-	s := seeder.New(db, fsys)
+	s := seeder.New(db, goodSeeds)
 
 	_, err = s.Run(t.Context())
 	require.NoError(t, err)
